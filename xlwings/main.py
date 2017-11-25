@@ -2815,6 +2815,92 @@ class Sheets(Collection):
         return Sheet(impl=impl)
 
 
+class SheetsGroup(Collection):
+    _wrap = Sheet
+
+    def __init__(self, impl, *name_or_index):
+        super().__init__(impl)
+        self._group_names = set() # order doesn't matter since sheets can be moved around
+        for nori in name_or_index:
+            if isinstance(nori, Sheet):
+                sh = nori
+            else:
+                sh = Sheet(impl=self.impl(nori))
+            self._group_names.add(sh.name.lower())
+
+    @property
+    def active(self):
+        """
+        Returns the active Sheet if it is part of the group. Raises an error otherwise.
+        """
+        sht = Sheet(impl=self.impl.active)
+        if sht.name.lower() not in self._group_names:
+            raise ValueError("The active sheet '%s' is not part of the sheet group" % sht.name)
+        return sht
+
+    def __delitem__(self, name_or_index):
+        sh = self[name_or_index]
+        try:
+            self._group_names.remove(sh.name.lower())
+            sh.delete()
+        except KeyError:
+            raise ValueError("Sheet name '%s' is not part of the sheet group" % sht.name)
+
+    def __call__(self, name_or_index):
+        if isinstance(name_or_index, Sheet):
+            sh = name_or_index
+        else:
+            try:
+                name = name_or_index.lower()
+            except AttributeError:
+                allsheets = (self.impl(i+1) for i in range(len(self.impl)))
+                sheets_impl = (sh_impl for sh_impl in allsheets if sh_impl.name.lower() in self._group_names)
+                name = list(sheets_impl)[name_or_index-1].name
+            sh = Sheet(impl=self.impl(name))
+        if sh.name.lower() in self._group_names:
+            return sh
+        else:
+            raise ValueError("Sheet name '%s' is not part of the sheet group" % sh.name)
+
+    def __len__(self):
+        return len(list(iter(self)))
+
+    def __iter__(self):
+        iself = super().__iter__()
+        yield from (sh for sh in iself if sh.name.lower() in self._group_names)
+
+    def add(self, name=None, before=None, after=None):
+        """
+        If the sheet name does not already exist:
+        Creates a new Sheet, adds it to the sheet group, and makes it the active sheet.
+
+        If the sheet name exists:
+        Adds the existing sheet to the sheet group and makes it the active sheet. The 
+        before and after arguments are ignored.
+
+        Parameters
+        ----------
+        name : str, default None
+            Name of the new sheet. If None, will default to Excel's default name.
+        before : Sheet, default None
+            An object that specifies the sheet before which the new sheet is added.
+        after : Sheet, default None
+            An object that specifies the sheet after which the new sheet is added.
+
+        Returns
+        -------
+
+        """
+        sheets = Sheets(impl=self.impl)
+        try:
+            sh = sheets.add(name, before, after)
+        except ValueError:
+            # sheet exists; no problem because ok to add existing sheet to sheet group
+            sh = sheets(name)
+        self._group_names.add(sh.name.lower())
+        return self(sh.name)
+
+
 class ActiveAppBooks(Books):
 
     def __init__(self):
