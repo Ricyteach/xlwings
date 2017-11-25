@@ -183,6 +183,24 @@ class TestBook(TestBase):
         if os.path.isfile(target_file_path):
             os.remove(target_file_path)
 
+    def test_export_pdf(self):
+        if sys.platform.startswith('darwin') and self.app1.version.major >= 15:
+            folder = os.path.expanduser("~") + '/Library/Containers/com.microsoft.Excel/Data/'
+            if os.path.isdir(folder):
+                os.chdir(folder)
+
+        cwd = os.getcwd()
+        target_file_path = os.path.join(cwd, 'TestFile.pdf')
+        if os.path.isfile(target_file_path):
+            os.remove(target_file_path)
+
+        self.wb1.export(filename=target_file_path, open_after_publish=False)
+
+        self.assertTrue(os.path.isfile(target_file_path))
+
+        if os.path.isfile(target_file_path):
+            os.remove(target_file_path)
+
     def test_fullname(self):
         fullname = os.path.join(this_dir, 'test book.xlsx')
         wb = self.app1.books.open(fullname)
