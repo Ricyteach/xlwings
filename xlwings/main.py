@@ -2965,6 +2965,15 @@ class SheetsGroup(Collection):
         self._group_names.add(sh.name.lower())
         return self(sh.name)
 
+    def toggle_visibility(self, visible=None):
+        toggle = {-1:0, 2:-1, 0:-1}
+        if visible is None:
+            for sh in self:
+                sh.visible = toggle[sh.visible]
+        else:
+            for sh in self:
+                sh.visible = visible
+
     def export(self, type='PDF', filename=None, quality=0, include_doc_properties=True, ignore_print_areas=False, first=None, last=None, open_after_publish=True):
         """
         Exports the sheet group workbook to the selected file type (PDF or XPS) including only the sheets in the sheet group.
