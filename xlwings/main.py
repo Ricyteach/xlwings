@@ -648,6 +648,15 @@ class Book(object):
         """
         return Sheets(impl=self.impl.sheets)
 
+    def sheets_group(self, *name_or_index):
+        """
+        Returns a sheets collection that represents a subset the sheets in the book.
+
+        .. versionadded:: ____
+        """
+        
+        return SheetsGroup(self.sheets.impl, *name_or_index)
+
     @property
     def app(self):
         """
@@ -807,6 +816,27 @@ class Sheet(object):
 
     def __hash__(self):
         return hash((self.book, self.name))
+
+    @property
+    def visible(self):
+        """
+        Gets or sets the visibility of a worksheet. Options are:
+        
+        -1: visible
+        0: hidden
+        2: very hidden
+
+        .. versionadded:: ______
+        """
+        return self.api.Visible
+
+    @visible.setter
+    def visible(self, value):
+        if value not in (-1, 0, 2):
+            raise ValueError("Invalid value for visible property provided.")
+        if value!=-1 and not any(sh.visible==-1 for sh in self.book.sheets if sh.name!=self.name):
+            raise Exception("Cannot hide last visible sheet")
+        self.api.Visible = value
 
     @property
     def name(self):
@@ -2848,6 +2878,149 @@ class Sheets(Collection):
         if name is not None:
             impl.name = name
         return Sheet(impl=impl)
+
+
+class SheetsGroup(Collection):
+    _wrap = Sheet
+
+    def __init__(self, impl, *name_or_index):
+        super().__init__(impl)
+        self._group_names = set() # order doesn't matter since sheets can be moved around
+        for nori in name_or_index:
+            if isinstance(nori, Sheet):
+                sh = nori
+            else:
+                sh = Sheet(impl=self.impl(nori))
+            self._group_names.add(sh.name.lower())
+
+    @property
+    def active(self):
+        """
+        Returns the active Sheet if it is part of the group. Raises an error otherwise.
+        """
+        sht = Sheet(impl=self.impl.active)
+        if sht.name.lower() not in self._group_names:
+            raise ValueError("The active sheet '%s' is not part of the sheet group" % sht.name)
+        return sht
+
+    def __delitem__(self, name_or_index):
+        sh = self[name_or_index]
+        try:
+            self._group_names.remove(sh.name.lower())
+            sh.delete()
+        except KeyError:
+            raise ValueError("Sheet name '%s' is not part of the sheet group" % sht.name)
+
+    def __call__(self, name_or_index):
+        if isinstance(name_or_index, Sheet):
+            sh = name_or_index
+        else:
+            try:
+                name = name_or_index.lower()
+            except AttributeError:
+                allsheets = (self.impl(i+1) for i in range(len(self.impl)))
+                sheets_impl = (sh_impl for sh_impl in allsheets if sh_impl.name.lower() in self._group_names)
+                name = list(sheets_impl)[name_or_index-1].name
+            sh = Sheet(impl=self.impl(name))
+        if sh.name.lower() in self._group_names:
+            return sh
+        else:
+            raise ValueError("Sheet name '%s' is not part of the sheet group" % sh.name)
+
+    def __len__(self):
+        return len(list(iter(self)))
+
+    def __iter__(self):
+        iself = super().__iter__()
+        yield from (sh for sh in iself if sh.name.lower() in self._group_names)
+
+    def add(self, name=None, before=None, after=None):
+        """
+        If the sheet name does not already exist:
+        Creates a new Sheet, adds it to the sheet group, and makes it the active sheet.
+
+        If the sheet name exists:
+        Adds the existing sheet to the sheet group and makes it the active sheet. The 
+        before and after arguments are ignored.
+
+        Parameters
+        ----------
+        name : str, default None
+            Name of the new sheet. If None, will default to Excel's default name.
+        before : Sheet, default None
+            An object that specifies the sheet before which the new sheet is added.
+        after : Sheet, default None
+            An object that specifies the sheet after which the new sheet is added.
+
+        Returns
+        -------
+
+        """
+        sheets = Sheets(impl=self.impl)
+        try:
+            sh = sheets.add(name, before, after)
+        except ValueError:
+            # sheet exists; no problem because ok to add existing sheet to sheet group
+            sh = sheets(name)
+        self._group_names.add(sh.name.lower())
+        return self(sh.name)
+
+    def toggle_visibility(self, visible=None):
+        toggle = {-1:0, 2:-1, 0:-1}
+        if visible is None:
+            for sh in self:
+                sh.visible = toggle[sh.visible]
+        else:
+            for sh in self:
+                sh.visible = visible
+
+    def export(self, type='PDF', filename=None, quality=0, include_doc_properties=True, ignore_print_areas=False, first=None, last=None, open_after_publish=True):
+        """
+        Exports the sheet group workbook to the selected file type (PDF or XPS) including only the sheets in the sheet group.
+
+        This is accomplished by hiding the sheets that are not in the sheet group before exporting the containing workbook.
+
+        Parameters
+        ----------
+        type : str, default PDF
+            Export file type. Options are PDF or XPS.
+        filename : str, default None
+            Name of the exported file. If None, will default to the Excel workbook name.
+        quality : int, default 0
+            Choices are 0: standard quality and 1: minimum quality.
+        include_doc_properties : bool, default True
+            Set to True to indicate that document properties should be included or set to False to indicate that they are omitted.
+        ignore_print_areas : bool, default False
+            If set to True, ignores any print areas set when publishing. If set to False , will use the print areas set when publishing.
+        first : int, default None
+            Specifies the first page number to be printed. If None, will default to page 1.
+        last : int, default None
+            Specifies the last page number to be printed. If None, will default to the last page.
+        open_after_publish : bool, default True
+            If set to True displays file in viewer after it is published. If set to False the file is published but not displayed.
+
+        Returns
+        -------
+
+        """
+        try:
+            wb = self(1).book
+        except IndexError:
+            raise TypeError("Cannot export an empty sheet group.")
+        visible = []
+        for sh in wb.sheets:
+            visible.append(sh.visible)
+            sh.visible = -1
+        for sh in wb.sheets:
+            if sh.name.lower() not in self._group_names:
+                sh.visible = 0
+        wb.export(type, filename, quality, include_doc_properties, ignore_print_areas, first, last, open_after_publish)
+        for sh,v in zip(wb.sheets, visible):
+            if v == -1:
+                sh.visible = v
+        for sh,v in zip(wb.sheets, visible):
+            if v != -1:
+                sh.visible = v
 
 
 class ActiveAppBooks(Books):
