@@ -648,6 +648,15 @@ class Book(object):
         """
         return Sheets(impl=self.impl.sheets)
 
+    def sheets_group(self, *name_or_index):
+        """
+        Returns a sheets collection that represents a subset the sheets in the book.
+
+        .. versionadded:: ____
+        """
+        
+        return SheetsGroup(self.sheets.impl, *name_or_index)
+
     @property
     def app(self):
         """
