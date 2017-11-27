@@ -216,5 +216,10 @@ class TestBook(TestBase):
         self.wb1.sheets.add()
         self.assertEqual(len(self.wb1.sheets), 4)
 
+    def test_export(self):
+        filename='test.pdf'
+        self.wb1.sheets(1)['a1'].value = 1 # can't export empty sheet
+        self.wb1.export(filename=os.path.join(self.tmp,filename), open_after_publish=False)
+
 if __name__ == '__main__':
     unittest.main()

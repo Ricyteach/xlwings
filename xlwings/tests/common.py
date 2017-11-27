@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 import os
 import inspect
 import unittest
+import shutil
 
 import xlwings as xw
 
@@ -18,6 +19,11 @@ class TestBase(unittest.TestCase):
     def setUpClass(cls):
         cls.app1 = xw.App(visible=False, spec=SPEC)
         cls.app2 = xw.App(visible=False, spec=SPEC)
+        cls.tmp=os.path.realpath(os.path.join(this_dir,'_tmp'))
+        try:
+            os.makedirs(self.tmp)
+        except OSError:
+            pass
 
     def setUp(self):
         self.wb1 = self.app1.books.add()
@@ -36,3 +42,7 @@ class TestBase(unittest.TestCase):
     def tearDownClass(cls):
         cls.app1.kill()
         cls.app2.kill()
+        try:
+            shutil.rmtree(cls.tmp)
+        except OSError:
+            pass
