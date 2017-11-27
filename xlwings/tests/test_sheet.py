@@ -136,6 +136,18 @@ class TestSheet(TestBase):
         self.wb1.sheets['Sheet1'].delete()
         self.assertFalse('Sheet1' in [i.name for i in self.wb1.sheets])
 
+    def test_visible_get(self):
+        self.assertTrue(all(i.visible==-1 for i in self.wb1.sheets))
+
+    def test_visible_set(self):
+        self.wb1.sheets(1).visible = 0
+        self.assertTrue(self.wb1.sheets(1).visible==0)
+
+    def test_visible_hide_last(self):
+        # the last visible sheet cannot be hidden
+        with self.assertRaises(Exception):
+            for s in self.wb1.sheets:
+                s.visible = 0
 
 if __name__ == '__main__':
     unittest.main()
