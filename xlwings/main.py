@@ -783,6 +783,27 @@ class Sheet(object):
         return hash((self.book, self.name))
 
     @property
+    def visible(self):
+        """
+        Gets or sets the visibility of a worksheet. Options are:
+        
+        -1: visible
+        0: hidden
+        2: very hidden
+
+        .. versionadded:: ______
+        """
+        return self.api.Visible
+
+    @visible.setter
+    def visible(self, value):
+        if value not in (-1, 0, 2):
+            raise ValueError("Invalid value for visible property provided.")
+        if value!=-1 and not any(sh.visible==-1 for sh in self.book.sheets if sh.name!=self.name):
+            raise Exception("Cannot hide last visible sheet")
+        self.api.Visible = value
+
+    @property
     def name(self):
         """Gets or sets the name of the Sheet."""
         return self.impl.name
