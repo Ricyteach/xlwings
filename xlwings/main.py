@@ -2930,6 +2930,54 @@ class SheetsGroup(Collection):
         self._group_names.add(sh.name.lower())
         return self(sh.name)
 
+    def export(self, type='PDF', filename=None, quality=0, include_doc_properties=True, ignore_print_areas=False, first=None, last=None, open_after_publish=True):
+        """
+        Exports the sheet group workbook to the selected file type (PDF or XPS) including only the sheets in the sheet group.
+
+        This is accomplished by hiding the sheets that are not in the sheet group before exporting the containing workbook.
+
+        Parameters
+        ----------
+        type : str, default PDF
+            Export file type. Options are PDF or XPS.
+        filename : str, default None
+            Name of the exported file. If None, will default to the Excel workbook name.
+        quality : int, default 0
+            Choices are 0: standard quality and 1: minimum quality.
+        include_doc_properties : bool, default True
+            Set to True to indicate that document properties should be included or set to False to indicate that they are omitted.
+        ignore_print_areas : bool, default False
+            If set to True, ignores any print areas set when publishing. If set to False , will use the print areas set when publishing.
+        first : int, default None
+            Specifies the first page number to be printed. If None, will default to page 1.
+        last : int, default None
+            Specifies the last page number to be printed. If None, will default to the last page.
+        open_after_publish : bool, default True
+            If set to True displays file in viewer after it is published. If set to False the file is published but not displayed.
+
+        Returns
+        -------
+
+        """
+        try:
+            wb = self(1).book
+        except IndexError:
+            raise TypeError("Cannot export an empty sheet group.")
+        visible = []
+        for sh in wb.sheets:
+            visible.append(sh.visible)
+            sh.visible = -1
+        for sh in wb.sheets:
+            if sh.name.lower() not in self._group_names:
+                sh.visible = 0
+        wb.export(type, filename, quality, include_doc_properties, ignore_print_areas, first, last, open_after_publish)
+        for sh,v in zip(wb.sheets, visible):
+            if v == -1:
+                sh.visible = v
+        for sh,v in zip(wb.sheets, visible):
+            if v != -1:
+                sh.visible = v
+
 
 class ActiveAppBooks(Books):
 
