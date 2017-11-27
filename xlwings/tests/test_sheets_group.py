@@ -1,8 +1,24 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 import pytest
+import inspect
+from os import path, makedirs
+import shutil
 
 import xlwings as xw
+
+@pytest.fixture
+def tmpdir(scope="module"):
+    tmp=path.realpath(path.join(path.dirname(inspect.getfile(inspect.currentframe())),'_tmp'))
+    try:
+        makedirs(tmp)
+    except OSError:
+        pass
+    yield tmp
+    try:
+        shutil.rmtree(tmp)
+    except OSError:
+        pass
 
 def make_app():
     return xw.App(visible=False)
@@ -100,5 +116,11 @@ def test_add_name_already_taken(grp1):
     # does not raise exception because just adds existing sheet to group
     grp1.add('Sheet3')
     assert grp1[2].name.lower() == 'sheet3'
+
+def test_export(grp1,tmpdir):
+    filename='test.pdf'
+    grp1.active['A1'].value='test'
+    grp1.export(filename=path.join(tmpdir,filename), open_after_publish=False)
+
 
 
